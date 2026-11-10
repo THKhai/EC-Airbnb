@@ -1,0 +1,142 @@
+# Production stack for https://airbnb.kaitr.dev (home server, behind the shared Traefik + Cloudflare Tunnel).
+# Deployed by .github/workflows/deploy.yml; secrets come from ~/apps/airbnb/.env (see deploy/.env.example).
+#
+# Routing on airbnb.kaitr.dev (Traefik, entrypoint "web"):
+#   /api/v1/*, /api/sending_bid, /api/receiving_bid, /winlose/*, /winner/*  -> be  (FastAPI :8000)
+#   /ws/*                                                                   -> ws  (WebSocket :8080)
+#   everything else (incl. Next's own /api/auth/session)                     -> fe  (Next.js :3000)
+# postgres / redis / rabbitmq are only on the private "internal" network. No `ports:` anywhere.
+# The ws-server's /push and /broadcast HTTP endpoints are reachable only from inside (be -> http://ws:8080).
+
+name: airbnb
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-airbnb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro   # runs only on an empty data dir
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [internal]
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]   # cache/locks only: no persistence
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [internal]
+    logging: *logging
+
+  rabbitmq:
+    image: rabbitmq:4.1-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-airbnb}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+      # Stream clients reconnect to the advertised host: must be the service name.
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbitmq_stream advertised_host rabbitmq
+    volumes:
+      - ./deploy/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks: [internal]
+    logging: *logging
+
+  ws:
+    build: ./ws-server
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis: { condition: service_healthy }
+    networks: [edge, internal]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.airbnb-ws.rule=Host(`airbnb.kaitr.dev`) && PathPrefix(`/ws`)
+      - traefik.http.routers.airbnb-ws.priority=100
+      - traefik.http.routers.airbnb-ws.entrypoints=web
+      - traefik.http.services.airbnb-ws.loadbalancer.server.port=8080
+    logging: *logging
+
+  be:
+    build: ./ecommerce_be
+    restart: unless-stopped
+    env_file: .env   # DEMO_JWT_SECRET, AUTH0_*, ADMIN_USER_IDS, ... (see deploy/.env.example)
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-airbnb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ecommerce_db}
+      REDIS__HOST: redis
+      REDIS__PORT: "6379"
+      RABBITMQ__HOST: rabbitmq
+      RABBITMQ__PORT: "5552"
+      RABBITMQ__USERNAME: ${RABBITMQ_USER:-airbnb}
+      RABBITMQ__PASSWORD: ${RABBITMQ_PASSWORD}
+      WS_SERVER_URL: http://ws:8080
+      ALLOWED_ORIGINS: https://airbnb.kaitr.dev
+      DEMO_LOGIN: "true"
+      PAYMENT_MODE: mock
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      ws: { condition: service_started }
+    networks: [edge, internal]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.airbnb-api.rule=Host(`airbnb.kaitr.dev`) && (PathPrefix(`/api/v1`) || Path(`/api/sending_bid`) || Path(`/api/receiving_bid`) || PathPrefix(`/winlose`) || PathPrefix(`/winner`))
+      - traefik.http.routers.airbnb-api.priority=100
+      - traefik.http.routers.airbnb-api.entrypoints=web
+      - traefik.http.services.airbnb-api.loadbalancer.server.port=8000
+    logging: *logging
+
+  fe:
+    build:
+      context: ./ecommerce_fe
+      args:   # inlined into the JS bundle at build time: public values only
+        NEXT_PUBLIC_API_URL: https://airbnb.kaitr.dev/api/v1
+        NEXT_PUBLIC_WS_URL: wss://airbnb.kaitr.dev/ws
+        NEXT_PUBLIC_PAYMENT_MOCK: "true"
+        NEXT_PUBLIC_AUTH0_DOMAIN: ${NEXT_PUBLIC_AUTH0_DOMAIN:-}
+        NEXT_PUBLIC_AUTH0_CLIENT_ID: ${NEXT_PUBLIC_AUTH0_CLIENT_ID:-}
+        NEXT_PUBLIC_AUTH0_AUDIENCE: ${NEXT_PUBLIC_AUTH0_AUDIENCE:-}
+        NEXT_PUBLIC_LOCATIONIQ_API_KEY: ${NEXT_PUBLIC_LOCATIONIQ_API_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      be: { condition: service_healthy }
+    networks: [edge]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.airbnb.rule=Host(`airbnb.kaitr.dev`)
+      - traefik.http.routers.airbnb.entrypoints=web
+      - traefik.http.services.airbnb.loadbalancer.server.port=3000
+    logging: *logging
+
+networks:
+  edge:
+    external: true
+  internal: {}
+
+volumes:
+  pgdata:

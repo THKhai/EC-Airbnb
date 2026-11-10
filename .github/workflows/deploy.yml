@@ -1,0 +1,64 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  PROJECT: airbnb
+  COMPOSE_FILE: docker-compose.prod.yml
+
+jobs:
+  deploy:
+    # Only repos owned by THKhai deploy (blocks forks)
+    if: github.repository_owner == 'THKhai'
+    runs-on: [self-hosted, homeserver]
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load server-side secrets
+        run: |
+          SRC="$HOME/apps/$PROJECT/.env"
+          [ -f "$SRC" ] || { echo "::error::$SRC not found on server (see deploy/.env.example)"; exit 1; }
+          cp "$SRC" .env
+
+      - name: Install nightly reset script
+        run: install -m 755 deploy/reset-demo.sh "$HOME/apps/$PROJECT/reset-demo.sh"
+
+      - name: Check edge network
+        run: docker network inspect edge >/dev/null || { echo "::error::deploy infra first"; exit 1; }
+
+      - name: Build and start
+        run: docker compose -p "$PROJECT" up -d --build --remove-orphans
+
+      - name: Wait until healthy
+        run: |
+          for i in $(seq 1 60); do
+            states=$(docker compose -p "$PROJECT" ps --format '{{.Service}} {{.State}} {{.Health}}')
+            echo "[$i] $states" | tr '\n' ';'; echo
+            if [ -n "$states" ] && ! echo "$states" | grep -qvE ' running( healthy|\s*$)'; then
+              echo "All services up"; exit 0
+            fi
+            sleep 5
+          done
+          docker compose -p "$PROJECT" logs --tail=80
+          exit 1
+
+      - name: Smoke (read-only, inside the network)
+        run: |
+          docker compose -p "$PROJECT" exec -T be python -c "
+          import json, urllib.request as u
+          for p in ['/api/v1/health', '/api/v1/auth/demo-accounts', '/api/v1/properties/search?page=1&limit=1']:
+              r = u.urlopen('http://127.0.0.1:8000' + p, timeout=10); print(r.status, p)
+          "
+
+      - name: Prune old images
+        if: always()
+        run: docker image prune -f >/dev/null

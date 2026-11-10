@@ -1,0 +1,9 @@
+[Unit]
+Description=Nightly demo data reset for airbnb.kaitr.dev (04:00 Vietnam time)
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Asia/Ho_Chi_Minh
+Persistent=true
+
+[Install]
+WantedBy=timers.target
