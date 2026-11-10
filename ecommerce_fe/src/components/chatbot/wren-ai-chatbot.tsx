@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { WREN_AI_ENABLED } from '@/lib/wren-ai/config'
 import { useWrenAIChatbot } from '@/hooks/use-wren-ai-chatbot';
 import { MessageBubble } from './message-bubble';
 import { ChatInput } from './chat-input';
@@ -23,7 +24,11 @@ interface WrenAIChatbotProps {
   defaultMinimized?: boolean;
 }
 
-export const WrenAIChatbot: React.FC<WrenAIChatbotProps> = ({
+/** Renders nothing when WrenAI is not configured (NEXT_PUBLIC_WREN_AI_URL unset). */
+export const WrenAIChatbot: React.FC<WrenAIChatbotProps> = (props) =>
+  WREN_AI_ENABLED ? <WrenAIChatbotInner {...props} /> : null
+
+const WrenAIChatbotInner: React.FC<WrenAIChatbotProps> = ({
   className = '',
   defaultMinimized = false
 }) => {

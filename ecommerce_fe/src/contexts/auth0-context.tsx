@@ -125,7 +125,7 @@ function Auth0SyncUser() {
         let appUser = null as null | { id: string, name?: string | null, picture?: string | null }
         try {
           // Best effort backend sync
-          appUser = await userApi.syncAuth0User({ auth0UserId, email, emailVerified, name, picture })
+          appUser = await userApi.syncAuth0User({ auth0UserId, email, emailVerified, name, picture }, accessToken)
         } catch (err) {
           console.warn('User sync failed (non-fatal):', err)
         }

@@ -1,4 +1,7 @@
 // WrenAI Configuration
+// The assistant is optional: without NEXT_PUBLIC_WREN_AI_URL it is not rendered (no failing requests).
+export const WREN_AI_ENABLED = Boolean(process.env.NEXT_PUBLIC_WREN_AI_URL)
+
 export const WREN_AI_CONFIG = {
   baseUrl: process.env.NEXT_PUBLIC_WREN_AI_URL || 'http://localhost:5555',
   endpoints: {

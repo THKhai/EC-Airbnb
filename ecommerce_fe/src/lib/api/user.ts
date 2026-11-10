@@ -19,8 +19,13 @@ interface Auth0SyncResponseBody {
 
 export const userApi = {
   // Upsert user in backend after Auth0 login
-  syncAuth0User: async (payload: Auth0SyncRequestBody): Promise<Auth0SyncResponseBody> => {
-    return apiClient.post('/users/auth0-sync', payload, { requireAuth: true })
+  // accessToken: pass the token you already hold (right after login the shared token getter
+  // may not reflect the new Auth0 session yet, which made the first sync fail with 401).
+  syncAuth0User: async (payload: Auth0SyncRequestBody, accessToken?: string): Promise<Auth0SyncResponseBody> => {
+    return apiClient.post('/users/auth0-sync', payload, {
+      requireAuth: true,
+      ...(accessToken ? { getAccessTokenSilently: async () => accessToken } : {}),
+    })
   },
 
   // Update user profile in backend (app-specific fields)
