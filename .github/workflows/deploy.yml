@@ -59,6 +59,14 @@ jobs:
               r = u.urlopen('http://127.0.0.1:8000' + p, timeout=10); print(r.status, p)
           "
 
+      - name: Logs on failure
+        if: failure()
+        run: |
+          docker compose -p "$PROJECT" ps -a || true
+          for svc in postgres rabbitmq redis ws be fe; do
+            echo "::group::$svc"; docker compose -p "$PROJECT" logs --tail=60 "$svc" 2>&1 || true; echo "::endgroup::"
+          done
+
       - name: Prune old images
         if: always()
         run: docker image prune -f >/dev/null

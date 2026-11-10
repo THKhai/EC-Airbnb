@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS public.property_types (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE public.property_types OWNER TO postgres;
 
 -- Tạo bảng property_categories
 CREATE TABLE IF NOT EXISTS public.property_categories (
@@ -22,7 +21,6 @@ CREATE TABLE IF NOT EXISTS public.property_categories (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE public.property_categories OWNER TO postgres;
 
 -- Đồng bộ dữ liệu property_type từ bảng properties
 INSERT INTO public.property_types (name)
