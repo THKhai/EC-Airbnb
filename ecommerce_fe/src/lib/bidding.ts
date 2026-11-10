@@ -1,5 +1,6 @@
+import { API_ORIGIN } from '@/lib/api/urls'
 import {BidData} from "@/types/bidding";
-const API_URL ='http://localhost:8000/api';
+const API_URL = `${API_ORIGIN}/api`;
 export const biddingAPI = {
     async fetch_sending_bid(bidData: BidData) {
         try {

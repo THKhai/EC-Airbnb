@@ -1,5 +1,6 @@
 'use client';
 
+import { API_V1 } from '@/lib/api/urls'
 import { Calendar, MessageCircle, CheckCircle, Trash2, Bell, BellOff, Send, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -92,7 +93,7 @@ export default function NotificationsPage() {
 
   const handleSendTestNotification = async () => {
     try {
-      await axios.post(`http://127.0.0.1:8000/api/v1/notifications/create`, {
+      await axios.post(`${API_V1}/notifications/create`, {
         user_id: userId,
         title: 'Test Notification',
         message: 'This is a test notification sent from the frontend!',

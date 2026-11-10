@@ -1,3 +1,4 @@
+import { API_ORIGIN } from '@/lib/api/urls'
 import {eachDayOfInterval, isSameDay} from "date-fns";
 import {useCallback, useEffect, useRef, useState} from "react";
 import { WinLossData} from "@/types/calendar";
@@ -135,7 +136,7 @@ export const useWinLossStatusPolling = (
             setError(null);
 
             const response = await fetch(
-                `http://localhost:8000/calendar/auction/${auctionId}/user/${userId}/win-loss-status?property_id=${propertyId}`
+                `${API_ORIGIN}/calendar/auction/${auctionId}/user/${userId}/win-loss-status?property_id=${propertyId}`
             );
 
             if (!response.ok) {

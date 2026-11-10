@@ -1,3 +1,4 @@
+import { API_ORIGIN } from '@/lib/api/urls'
 // components/bid/WinLossStatusFromAPI.tsx
 "use client"
 
@@ -76,7 +77,7 @@ export function WinLossStatusFromAPI({
 
         try {
             // Use new API endpoint
-            const url = `http://localhost:8000/winlose/user/${user_id}/auction/${auctionId}`
+            const url = `${API_ORIGIN}/winlose/user/${user_id}/auction/${auctionId}`
 
             console.log('🔍 Fetching win-loss status:', url)
 

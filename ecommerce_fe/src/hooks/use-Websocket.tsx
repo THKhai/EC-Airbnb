@@ -1,3 +1,4 @@
+import { WS_URL } from '@/lib/api/urls'
 import {useEffect,useRef,useState} from "react";
 
 export default function useWebsocket(auctionId:string) {
@@ -5,7 +6,7 @@ export default function useWebsocket(auctionId:string) {
     const ws = useRef<WebSocket | null>(null);
 
     useEffect(() => {
-        ws.current = new WebSocket(`ws://localhost:8080`);
+        ws.current = new WebSocket(WS_URL);
         ws.current.onopen = () => {
             ws.current?.send(auctionId);
         };

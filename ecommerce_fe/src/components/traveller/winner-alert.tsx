@@ -1,3 +1,4 @@
+import { API_ORIGIN } from '@/lib/api/urls'
 import React, { useState, useEffect } from 'react';
 import { Trophy, Check, X, Loader2, AlertCircle, Calendar, CreditCard, Users, Minus, Plus } from 'lucide-react';
 import { useCalendarContext } from "@/contexts/calender-context";
@@ -57,7 +58,7 @@ const WinnerAlert = ({
 
         setLoading(true);
         try {
-            const baseUrl = 'http://localhost:8000';
+            const baseUrl = API_ORIGIN;
             const response = await fetch(`${baseUrl}/winner/${auctionId}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }

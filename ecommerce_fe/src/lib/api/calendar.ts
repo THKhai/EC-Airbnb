@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+import { API_ORIGIN, API_V1 } from '@/lib/api/urls'
+const API_URL = API_V1;
 
 export const calendarAPI = {
     /**
@@ -8,7 +9,7 @@ export const calendarAPI = {
     async afterWinner(auctionId: string, propertyId: number): Promise<any> {
         try {
             const response = await fetch(
-                `${API_URL}/winner/after_winner/${auctionId}?property_id=${propertyId}`,
+                `${API_ORIGIN}/winner/after_winner/${auctionId}?property_id=${propertyId}`,
                 {
                     method: "POST",
                     headers: {
