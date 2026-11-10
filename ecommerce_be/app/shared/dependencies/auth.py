@@ -11,6 +11,7 @@ from ..models import User
 from ..exceptions import AuthenticationError, TokenExpiredError, InvalidTokenError
 from .database import get_db_session
 from ...core.config import settings
+from ...core import demo_mode
 
 security = HTTPBearer(auto_error=False)
 
@@ -20,7 +21,14 @@ _jwk_client: Optional[PyJWKClient] = PyJWKClient(_JWKS_URL) if _JWKS_URL else No
 
 
 def _decode_with_jwks(token: str) -> dict:
-	"""Decode RS256 JWT using Auth0 JWKS (kid-based)."""
+	"""Decode RS256 JWT using Auth0 JWKS (kid-based), or a demo HS256 token when AUTH_MODE=demo."""
+	if demo_mode.is_demo_auth():
+		try:
+			return demo_mode.decode_token(token)
+		except jwt.ExpiredSignatureError:
+			raise TokenExpiredError()
+		except jwt.InvalidTokenError:
+			raise InvalidTokenError()
 	if not _jwk_client:
 		raise AuthenticationError("Auth0 domain not configured for JWKS")
 	try:

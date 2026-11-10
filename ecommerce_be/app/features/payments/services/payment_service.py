@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 
 from ....core.config import settings
+from ....core import demo_mode
 from ....shared.exceptions import ValidationError, BusinessLogicError, NotFoundError, AuthorizationError
 from ....db.models import Bids, Auction, Property, Booking, PaymentSession, PaymentTransaction
 
@@ -235,11 +236,15 @@ class PaymentService:
 			"mac": mac,
 		}
 		print(create_payload)
-		resp = requests.post(self.cfg.create_url, json=create_payload, timeout=15)
-		print(resp.text)
-		if resp.status_code >= 400:
-			raise BusinessLogicError(f"ZaloPay create failed: {resp.text}", code="PAYMENT_CREATE_FAILED", status_code=502)
-		data = resp.json()
+		if demo_mode.is_mock_payment():
+			# No payment gateway: send the user straight to the redirect (confirmation) page.
+			data = {"return_code": 1, "order_url": redirect_url}
+		else:
+			resp = requests.post(self.cfg.create_url, json=create_payload, timeout=15)
+			print(resp.text)
+			if resp.status_code >= 400:
+				raise BusinessLogicError(f"ZaloPay create failed: {resp.text}", code="PAYMENT_CREATE_FAILED", status_code=502)
+			data = resp.json()
 		order_url = data.get("order_url") or data.get("orderurl")
 
 		# Persist session + transaction
@@ -279,10 +284,19 @@ class PaymentService:
 			"app_trans_id": app_trans_id,
 			"mac": self._sign_query(self.cfg.app_id, app_trans_id),
 		}
-		resp = requests.post(self.cfg.query_url, data=payload, timeout=15)
-		if resp.status_code >= 400:
-			raise BusinessLogicError("ZaloPay query failed", code="PAYMENT_QUERY_FAILED", status_code=502)
-		data = resp.json()
+		if demo_mode.is_mock_payment():
+			# Simulated gateway: every payment succeeds.
+			data = {
+				"return_code": 1,
+				"zp_trans_id": f"MOCK{int(time.time())}",
+				"server_time": int(time.time() * 1000),
+				"amount": int(session.amount),
+			}
+		else:
+			resp = requests.post(self.cfg.query_url, data=payload, timeout=15)
+			if resp.status_code >= 400:
+				raise BusinessLogicError("ZaloPay query failed", code="PAYMENT_QUERY_FAILED", status_code=502)
+			data = resp.json()
 		zstatus = data.get("return_code")
 		status_map = {1: "PAID", 2: "PENDING", 3: "FAILED"}
 		status = status_map.get(zstatus, "PENDING")

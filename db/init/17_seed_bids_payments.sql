@@ -1,9 +1,9 @@
--- Seed bids (3 per auction from the demo guests 500001-500005) and a PAID payment
+-- Seed bids (3 per auction from guests 500002-500005; the demo guest 500001 gets one fixed bid below) and a PAID payment
 -- for the top bid of each finished auction, so auction / payment screens are not empty.
 -- The bid trigger from 02_ writes bid_events automatically.
 INSERT INTO bids (auction_id, user_id, check_in, check_out, total_amount, status, bid_time)
 SELECT a.id,
-       500001 + ((row_number() OVER (ORDER BY a.id) + k) % 5),
+       500002 + ((dense_rank() OVER (ORDER BY a.id) + k) % 4),  -- distinct user per (auction, k)
        a.start_date,
        a.start_date + GREATEST(COALESCE(a.min_nights, 1), 1),
        (COALESCE(a.starting_price, 50) + k * COALESCE(NULLIF(a.bid_increment, 0), 5))
@@ -13,6 +13,11 @@ SELECT a.id,
 FROM auctions a
 CROSS JOIN generate_series(1, 3) AS k
 WHERE a.end_date > a.start_date;
+
+-- Demo guest (500001): highest bid on auction 1111… (Paris, property 3109): 2 nights, 2025-08-15 -> 17.
+-- Used by the demo walkthrough and scripts/smoke_demo.py (pay for this bid -> booking).
+INSERT INTO bids (auction_id, user_id, check_in, check_out, total_amount, status, bid_time)
+VALUES ('11111111-1111-1111-1111-111111111111', 500001, '2025-08-15', '2025-08-17', 300.00, 'ACTIVE', '2025-08-12 09:00:00');
 
 UPDATE auctions a
 SET total_bids = s.n,

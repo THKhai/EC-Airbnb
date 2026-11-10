@@ -6,6 +6,7 @@ from ...features.properties.api import router as properties_router
 from ...features.payments.api import router as payments_router
 from ...features.auctions.api import router as auctions_router
 from ...features.users.api import router as users_router
+from ...features.demo_auth.api import router as demo_auth_router
 
 # Create main v1 router
 api_router = APIRouter(prefix="/api/v1")
@@ -15,6 +16,7 @@ api_router.include_router(properties_router, tags=["properties"])
 api_router.include_router(auctions_router, tags=["auctions"])  # /api/v1/auctions
 api_router.include_router(payments_router)   # /api/v1/payment - preserve internal tags
 api_router.include_router(users_router, tags=["users"])         # /api/v1/users
+api_router.include_router(demo_auth_router)                       # /api/v1/auth (AUTH_MODE=demo)
 
 # Health check endpoint
 @api_router.get("/health")
