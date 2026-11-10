@@ -21,8 +21,8 @@ _jwk_client: Optional[PyJWKClient] = PyJWKClient(_JWKS_URL) if _JWKS_URL else No
 
 
 def _decode_with_jwks(token: str) -> dict:
-	"""Decode RS256 JWT using Auth0 JWKS (kid-based), or a demo HS256 token when AUTH_MODE=demo."""
-	if demo_mode.is_demo_auth():
+	"""Decode a demo HS256 token (DEMO_LOGIN=true) or an Auth0 RS256 token via JWKS (kid-based)."""
+	if demo_mode.is_demo_auth() and demo_mode.is_demo_token(token):
 		try:
 			return demo_mode.decode_token(token)
 		except jwt.ExpiredSignatureError:

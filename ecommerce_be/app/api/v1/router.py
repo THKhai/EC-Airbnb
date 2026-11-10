@@ -16,7 +16,7 @@ api_router.include_router(properties_router, tags=["properties"])
 api_router.include_router(auctions_router, tags=["auctions"])  # /api/v1/auctions
 api_router.include_router(payments_router)   # /api/v1/payment - preserve internal tags
 api_router.include_router(users_router, tags=["users"])         # /api/v1/users
-api_router.include_router(demo_auth_router)                       # /api/v1/auth (AUTH_MODE=demo)
+api_router.include_router(demo_auth_router)                       # /api/v1/auth (DEMO_LOGIN=true)
 
 # Health check endpoint
 @api_router.get("/health")

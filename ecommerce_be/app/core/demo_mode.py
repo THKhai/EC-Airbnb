@@ -1,7 +1,9 @@
 """Demo mode: run the app without the (retired) Auth0 and ZaloPay accounts.
 
-AUTH_MODE=demo     -> the API issues its own HS256 tokens for whitelisted demo users
-                      (POST /api/v1/auth/demo-login) instead of verifying Auth0 RS256 tokens.
+DEMO_LOGIN=true    -> the API also issues its own HS256 tokens for whitelisted demo users
+                      (POST /api/v1/auth/demo-login). Auth0 RS256 tokens keep working when
+                      AUTH0_DOMAIN is set, so both logins can be offered side by side.
+                      (AUTH_MODE=demo is accepted as an alias.)
 PAYMENT_MODE=mock  -> ZaloPay create/query are simulated; payments succeed immediately.
 
 Demo tokens carry sub="demo|<user id>", matched against users.auth0_id exactly like
@@ -14,7 +16,10 @@ from typing import Optional
 
 import jwt
 
-AUTH_MODE = os.getenv("AUTH_MODE", "auth0").strip().lower()
+DEMO_LOGIN = (
+	os.getenv("DEMO_LOGIN", "").strip().lower() in ("1", "true", "yes")
+	or os.getenv("AUTH_MODE", "").strip().lower() == "demo"
+)
 PAYMENT_MODE = os.getenv("PAYMENT_MODE", "zalopay").strip().lower()
 
 DEMO_ISSUER = "ec-airbnb-demo"
@@ -28,7 +33,18 @@ _MIN_SECRET_LEN = 32
 
 
 def is_demo_auth() -> bool:
-	return AUTH_MODE == "demo"
+	return DEMO_LOGIN
+
+
+def is_demo_token(token: str) -> bool:
+	"""Demo tokens are HS256 with our issuer; Auth0 tokens are RS256. Each path verifies
+	with a fixed algorithm, so a token cannot be accepted by the other verifier."""
+	try:
+		header = jwt.get_unverified_header(token)
+		claims = jwt.decode(token, options={"verify_signature": False})
+	except jwt.PyJWTError:
+		return False
+	return header.get("alg") == "HS256" and claims.get("iss") == DEMO_ISSUER
 
 
 def is_mock_payment() -> bool:
@@ -45,7 +61,7 @@ def demo_subject(user_id: int) -> str:
 
 def issue_token(user_id: int, email: Optional[str]) -> tuple[str, int]:
 	if not secret_configured():
-		raise RuntimeError(f"DEMO_JWT_SECRET must be set (>= {_MIN_SECRET_LEN} chars) when AUTH_MODE=demo")
+		raise RuntimeError(f"DEMO_JWT_SECRET must be set (>= {_MIN_SECRET_LEN} chars) when DEMO_LOGIN=true")
 	now = int(time.time())
 	payload = {
 		"sub": demo_subject(user_id),

@@ -1,4 +1,4 @@
-"""Smoke test for demo mode (AUTH_MODE=demo, PAYMENT_MODE=mock). Stdlib only.
+"""Smoke test for demo mode (DEMO_LOGIN=true, PAYMENT_MODE=mock). Stdlib only.
 
     python scripts/smoke_demo.py                      # default http://127.0.0.1:8000
     BASE=https://airbnb.kaitr.dev python scripts/smoke_demo.py
@@ -58,6 +58,17 @@ check("no token -> 401/403", s in (401, 403), f"{s}")
 
 s, b = call("GET", "/api/v1/users/me", token="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkZW1vfDUwMDAwMSJ9.forged")
 check("forged token -> 401/403", s in (401, 403), f"{s}")
+
+import base64
+def _fake_jwt(header, claims):
+	enc = lambda d: base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b"=").decode()
+	return f"{enc(header)}.{enc(claims)}.c2ln"
+
+s, b = call("GET", "/api/v1/users/me", token=_fake_jwt({"alg": "RS256", "kid": "x"}, {"sub": "auth0|x"}))
+check("Auth0-style RS256 token (unverifiable) -> 401/403, not 500", s in (401, 403), f"{s}")
+
+s, b = call("GET", "/api/v1/users/me", token=_fake_jwt({"alg": "HS256"}, {"sub": "demo|500001", "iss": "someone-else"}))
+check("HS256 token with foreign issuer -> 401/403", s in (401, 403), f"{s}")
 
 s, b = call("POST", "/api/v1/auth/demo-login", {"user_id": NOT_DEMO})
 check("non-demo user cannot log in -> 403", s == 403, f"{s} {b}")

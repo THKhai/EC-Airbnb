@@ -1,4 +1,4 @@
-"""Demo login (AUTH_MODE=demo): password-less sign-in for a fixed whitelist of demo users."""
+"""Demo login (DEMO_LOGIN=true): password-less sign-in for a fixed whitelist of demo users."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
