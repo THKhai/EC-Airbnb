@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { LoginModal } from "@/components/auth/login-modal"
 import { SignupModal } from "@/components/auth/signup-modal"
 import { useRouter } from "next/navigation"
-import { useAuth0 } from "@auth0/auth0-react"
+import { useAppAuth0 as useAuth0 } from "@/contexts/auth0-context"
 import { useNavigationTranslations } from "@/hooks/use-translations"
 
 export function UserMenu() {

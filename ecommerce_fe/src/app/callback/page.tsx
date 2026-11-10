@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useAuth0 } from '@auth0/auth0-react'
+import { useAppAuth0 as useAuth0 } from "@/contexts/auth0-context"
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 

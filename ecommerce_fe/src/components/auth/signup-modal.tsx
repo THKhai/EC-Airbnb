@@ -7,7 +7,7 @@ import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 // import { Input } from "@/components/ui/input"  // removed form inputs
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { useAuth0 } from "@auth0/auth0-react"
+import { useAppAuth0 as useAuth0 } from "@/contexts/auth0-context"
 
 interface SignupModalProps {
 	isOpen: boolean

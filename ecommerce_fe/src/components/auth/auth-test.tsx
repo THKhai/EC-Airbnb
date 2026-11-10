@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth0 } from '@auth0/auth0-react'
+import { useAppAuth0 as useAuth0 } from "@/contexts/auth0-context"
 
 export function AuthTest() {
 	const { user, isAuthenticated, isLoading, loginWithRedirect, logout, getAccessTokenSilently } = useAuth0()

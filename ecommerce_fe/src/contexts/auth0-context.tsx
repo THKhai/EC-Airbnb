@@ -1,25 +1,105 @@
 'use client'
-import { Auth0Provider as Auth0SPAProvider, useAuth0 as useAuth0React } from '@auth0/auth0-react'
-import { ReactNode, useMemo, useEffect, useRef, useState } from 'react'
+import { Auth0Provider as Auth0SPAProvider, Auth0Context, useAuth0 as useAuth0React } from '@auth0/auth0-react'
+import type { Auth0ContextInterface, LogoutOptions, User as Auth0User } from '@auth0/auth0-react'
+import { ReactNode, createContext, useContext, useMemo, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { userApi } from '@/lib/api/user'
+import { clearDemoSession, getDemoSession, useDemoSession } from '@/lib/demo-session'
 import { useAuth } from './auth-context'
+
+/** Auth0 is optional: without NEXT_PUBLIC_AUTH0_DOMAIN/CLIENT_ID only demo accounts are offered. */
+const AUTH0_DOMAIN = process.env.NEXT_PUBLIC_AUTH0_DOMAIN || ''
+const AUTH0_CLIENT_ID = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || ''
+export const auth0Configured = Boolean(AUTH0_DOMAIN && AUTH0_CLIENT_ID)
+const Auth0EnabledContext = createContext(false)
 
 interface Auth0ProviderProps {
   children: ReactNode
 }
 
-function Auth0TokenBridge() {
-  const { getAccessTokenSilently } = useAuth0React()
+/** Exposes one token getter to lib/api/base.ts: demo session token first, else Auth0 (if signed in). */
+function TokenBridge() {
+  const auth0 = useContext(Auth0Context)
+  const enabled = useContext(Auth0EnabledContext)
+  const { isAuthenticated, getAccessTokenSilently } = auth0
   useEffect(() => {
-    ;(window as any).__getAccessTokenSilently = getAccessTokenSilently
+    const getter = async () => {
+      const demo = getDemoSession()
+      if (demo) return demo.token
+      if (enabled && isAuthenticated) return getAccessTokenSilently()
+      return null
+    }
+    ;(window as any).__getAccessTokenSilently = getter
     return () => {
-      if ((window as any).__getAccessTokenSilently === getAccessTokenSilently) {
+      if ((window as any).__getAccessTokenSilently === getter) {
         delete (window as any).__getAccessTokenSilently
       }
     }
-  }, [getAccessTokenSilently])
+  }, [enabled, isAuthenticated, getAccessTokenSilently])
   return null
+}
+
+/** Mirrors a demo session into the app session (auth-context), like Auth0SyncUser does for Auth0. */
+function DemoSessionBridge() {
+  const demo = useDemoSession()
+  const { login } = useAuth()
+  const syncedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!demo || syncedFor.current === demo.token) return
+    syncedFor.current = demo.token
+    login({ id: String(demo.user.id), name: demo.user.name, email: demo.user.email, avatar: demo.user.picture || undefined }, demo.token)
+  }, [demo, login])
+  return null
+}
+
+export type AppAuth0 = Auth0ContextInterface<Auth0User> & { auth0Enabled: boolean; isDemo: boolean }
+
+/**
+ * Drop-in replacement for useAuth0() that also understands demo sessions and works
+ * when Auth0 is not configured. Components should import this instead of @auth0/auth0-react.
+ */
+export function useAppAuth0(): AppAuth0 {
+  const auth0 = useContext(Auth0Context)
+  const enabled = useContext(Auth0EnabledContext)
+  const demo = useDemoSession()
+  const { logout: appLogout } = useAuth()
+
+  if (demo) {
+    return {
+      ...auth0,
+      isAuthenticated: true,
+      isLoading: false,
+      error: undefined,
+      user: { sub: `demo|${demo.user.id}`, name: demo.user.name, email: demo.user.email, picture: demo.user.picture || undefined },
+      getAccessTokenSilently: (async () => demo.token) as AppAuth0['getAccessTokenSilently'],
+      logout: async (options?: LogoutOptions) => {
+        clearDemoSession()
+        await appLogout()
+        const returnTo = options?.logoutParams?.returnTo
+        window.location.href = typeof returnTo === 'string' ? returnTo : '/'
+      },
+      auth0Enabled: enabled,
+      isDemo: true,
+    }
+  }
+  if (!enabled) {
+    // Outside Auth0SPAProvider the default context has isLoading=true forever and methods that throw.
+    return {
+      ...auth0,
+      isAuthenticated: false,
+      isLoading: false,
+      user: undefined,
+      loginWithRedirect: async () => {
+        console.warn('Auth0 is not configured on this deployment; use a demo account.')
+      },
+      logout: async () => {
+        await appLogout()
+      },
+      auth0Enabled: false,
+      isDemo: false,
+    }
+  }
+  return { ...auth0, auth0Enabled: true, isDemo: false }
 }
 
 function Auth0SyncUser() {
@@ -75,8 +155,8 @@ function Auth0SyncUser() {
 export function Auth0Provider({ children }: Auth0ProviderProps) {
   const router = useRouter()
 
-  const domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN as string
-  const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID as string
+  const domain = AUTH0_DOMAIN
+  const clientId = AUTH0_CLIENT_ID
   const audience = process.env.NEXT_PUBLIC_AUTH0_AUDIENCE as string | undefined
 
   const redirectUri = useMemo(() => {
@@ -93,7 +173,18 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
     router.replace(redirectTo)
   }
 
+  if (!auth0Configured) {
+    return (
+      <Auth0EnabledContext.Provider value={false}>
+        <TokenBridge />
+        <DemoSessionBridge />
+        {children}
+      </Auth0EnabledContext.Provider>
+    )
+  }
+
   return (
+    <Auth0EnabledContext.Provider value={true}>
     <Auth0SPAProvider
       domain={domain}
       clientId={clientId}
@@ -106,10 +197,12 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
       useRefreshTokens
       cacheLocation="localstorage"
     >
-      <Auth0TokenBridge />
+      <TokenBridge />
+      <DemoSessionBridge />
       <Auth0SyncUser />
       {children}
     </Auth0SPAProvider>
+    </Auth0EnabledContext.Provider>
   )
 }
 

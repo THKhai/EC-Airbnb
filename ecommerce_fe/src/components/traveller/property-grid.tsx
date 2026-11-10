@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Heart, Star, MapPin } from "lucide-react"
 import { PropertyCard, PropertyDisplay } from "@/types"
 import { formatPrice } from "@/lib/utils"
-import { useAuth0 } from "@auth0/auth0-react"
+import { useAppAuth0 as useAuth0 } from "@/contexts/auth0-context"
 
 interface PropertyGridProps {
   properties: PropertyCard[]

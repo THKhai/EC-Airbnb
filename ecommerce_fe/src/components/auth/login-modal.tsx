@@ -6,7 +6,8 @@ import { useState } from "react"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { useAuth0 } from "@auth0/auth0-react"
+import { useAppAuth0 as useAuth0 } from "@/contexts/auth0-context"
+import { DemoAccounts } from "./demo-accounts"
 
 interface LoginModalProps {
 	isOpen: boolean
@@ -18,7 +19,7 @@ interface LoginModalProps {
 export function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }: LoginModalProps) {
 	// no local form state; using Auth0 Universal Login
 	const [loading, setLoading] = useState<"none" | "google" | "email">("none")
-	const { loginWithRedirect } = useAuth0()
+	const { loginWithRedirect, auth0Enabled } = useAuth0()
 
 	const currentReturnTo = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}${window.location.hash}` : '/'
 
@@ -70,6 +71,7 @@ export function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }: Login
 						<div className="w-4" />
 					</div>
 
+					{auth0Enabled && (<>
 					{/* Social Login */}
 					<Button
 						onClick={handleGoogleLogin}
@@ -97,16 +99,21 @@ export function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }: Login
 						{loading === "email" && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
 						Continue with Email
 					</Button>
+					</>)}
+
+					<div className={auth0Enabled ? "mt-6" : ""}>
+						<DemoAccounts onSignedIn={onClose} />
+					</div>
 
 					{/* Switch to Signup */}
-					<div className="mt-6 text-center">
+					{auth0Enabled && <div className="mt-6 text-center">
 						<p className="text-sm text-gray-600">
 							Don't have an account?{" "}
 							<button onClick={onSwitchToSignup} className="text-blue-500 hover:text-blue-600 font-medium">
 								Sign up
 							</button>
 						</p>
-					</div>
+					</div>}
 				</div>
 			</DialogContent>
 		</Dialog>

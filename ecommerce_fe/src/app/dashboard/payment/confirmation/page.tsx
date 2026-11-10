@@ -1,7 +1,7 @@
 "use client"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { useAuth0 } from "@auth0/auth0-react"
+import { useAppAuth0 as useAuth0 } from "@/contexts/auth0-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
