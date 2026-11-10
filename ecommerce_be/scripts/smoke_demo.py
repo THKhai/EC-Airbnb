@@ -84,6 +84,15 @@ s, b = call("POST", "/api/v1/auth/demo-login", {"user_id": HOST})
 host_token = b.get("access_token") if s == 200 and isinstance(b, dict) else None
 check("demo login host", bool(host_token), f"{s} {b}")
 
+s, b = call("GET", "/api/v1/users/list/profiles")
+check("admin: list all profiles without token -> 401/403", s in (401, 403), f"{s}")
+
+s, b = call("GET", "/api/v1/users/list/profiles", token=guest_token)
+check("admin: list all profiles as demo guest -> 403", s == 403, f"{s}")
+
+s, b = call("PUT", f"/api/v1/users/status/{HOST}?status=inactive", token=guest_token)
+check("admin: guest cannot disable another account -> 403", s == 403, f"{s}")
+
 s, b = call("GET", "/api/v1/properties/search?page=1&limit=5")
 check("property search 200", s == 200, f"{s} {str(b)[:200]}")
 

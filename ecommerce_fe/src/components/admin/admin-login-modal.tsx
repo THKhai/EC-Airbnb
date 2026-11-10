@@ -67,7 +67,7 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@skyhigh.com"
+              placeholder="admin@example.com"
               required
             />
           </div>
@@ -110,11 +110,6 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
           </div>
         </form>
 
-        <div className="text-xs text-gray-500 text-center pt-4 border-t">
-          <p>Demo credentials:</p>
-          <p>Email: admin@skyhigh.com</p>
-          <p>Password: admin123</p>
-        </div>
       </DialogContent>
     </Dialog>
   )

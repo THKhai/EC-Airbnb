@@ -135,22 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Admin login function
-  const loginAsAdmin = async (email: string, password: string): Promise<boolean> => {
-    // Simple admin credentials check (in production, this should be server-side)
-    if (email === 'admin@skyhigh.com' && password === 'admin123') {
-      const adminUser: User = {
-        id: 'admin-1',
-        name: 'Admin User',
-        email: email,
-        role: 'admin'
-      }
-      
-      await login(adminUser)
-      return true
-    }
-    return false
-  }
+  // Admin login: there is no client-side admin account any more (the old one had its
+  // credentials in the JS bundle). Admin access must come from the backend.
+  const loginAsAdmin = async (_email: string, _password: string): Promise<boolean> => false
 
   return (
     <AuthContext.Provider value={{

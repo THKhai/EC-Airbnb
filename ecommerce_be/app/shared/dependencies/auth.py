@@ -83,6 +83,19 @@ async def get_current_user(
     return await _decode_token_and_get_user(credentials.credentials, db)
 
 
+# Admin = authenticated user whose id is listed in ADMIN_USER_IDS (comma-separated).
+# Empty by default: nobody can call admin endpoints (there is no role column).
+import os as _os
+ADMIN_USER_IDS = {int(x) for x in _os.getenv("ADMIN_USER_IDS", "").split(",") if x.strip().isdigit()}
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+	"""Require an authenticated admin (403 otherwise)."""
+	if user.id not in ADMIN_USER_IDS:
+		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+	return user
+
+
 def require_auth(user: User = Depends(get_current_user)) -> User:
     """Require authentication dependency."""
     return user

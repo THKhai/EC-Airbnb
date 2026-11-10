@@ -15,12 +15,12 @@ export default function AdminLayout({
   const router = useRouter()
   const { logout, isAdmin } = useAuth()
 
-  // // Handle admin access check and redirect
-  // useEffect(() => {
-  //   if (!isAdmin) {
-  //     router.push("/")
-  //   }
-  // }, [isAdmin, router])
+  // Admin area is only for admins (backend enforces ADMIN_USER_IDS on admin endpoints).
+  useEffect(() => {
+    if (!isAdmin) {
+      router.push("/")
+    }
+  }, [isAdmin, router])
 
   const handleLogout = async () => {
     await logout()
@@ -31,10 +31,10 @@ export default function AdminLayout({
     router.push("/")
   }
 
-  // // Don't render anything if not admin (will redirect)
-  // if (!isAdmin) {
-  //   return null
-  // }
+  // Don't render anything if not admin (will redirect)
+  if (!isAdmin) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">

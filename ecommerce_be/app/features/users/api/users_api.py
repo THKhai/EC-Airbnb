@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ....shared.dependencies.database import get_db_session
-from ....shared.dependencies.auth import verify_auth0_token, require_auth
+from ....shared.dependencies.auth import verify_auth0_token, require_auth, require_admin
 from ..services.user_service import UserService
 from ..schemas.auth0 import Auth0SyncRequest, Auth0SyncResponse
 from loguru import logger
@@ -105,7 +105,8 @@ async def get_me_profile(user = Depends(require_auth)):
 async def get_list_profiles(
     offset: int = 0, 
     limit: int = 100, 
-    service: UserService = Depends(get_user_service)
+    service: UserService = Depends(get_user_service),
+    _admin = Depends(require_admin),  # lists every user's email: admin only
 ):
     return [
         {
@@ -129,7 +130,8 @@ async def get_list_profiles(
 async def update_user_status(
 	user_id: int,
 	status: str,
-	service: UserService = Depends(get_user_service)
+	service: UserService = Depends(get_user_service),
+	_admin = Depends(require_admin),  # can disable any account: admin only
 ):
 	"""Update user status."""
 	try:
