@@ -1,5 +1,5 @@
 -- Seed bids (3 per auction from guests 500002-500005; the demo guest 500001 gets one fixed bid below) and a PAID payment
--- for the top bid of each finished auction, so auction / payment screens are not empty.
+-- for the top bid of each COMPLETED auction, so auction / payment screens are not empty.
 -- The bid trigger from 02_ writes bid_events automatically.
 INSERT INTO bids (auction_id, user_id, check_in, check_out, total_amount, status, bid_time)
 SELECT a.id,
@@ -34,6 +34,6 @@ SELECT DISTINCT ON (b.auction_id)
        'PAID',
        NULL
 FROM bids b JOIN auctions a ON a.id = b.auction_id
-WHERE a.auction_end_time < now()
+WHERE a.status IN ('COMPLETED', 'COMPLETE')   -- finished auctions (date-independent: 98_ shifts dates)
 ORDER BY b.auction_id, b.total_amount DESC
 LIMIT 10;

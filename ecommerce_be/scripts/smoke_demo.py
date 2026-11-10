@@ -4,7 +4,7 @@
     BASE=https://airbnb.kaitr.dev python scripts/smoke_demo.py
 
 Expects a database freshly initialised from db/init (demo guest 500001 has an unpaid
-bid on auction 1111… for 2025-08-15 -> 17). Payment steps mutate data; re-init to rerun them.
+bid on auction 1111…, 2 nights from the auction start date). Payment steps mutate data; re-init to rerun them.
 Exit code 0 = all checks passed.
 """
 
@@ -105,8 +105,17 @@ check("auctions of property 3109", s == 200, f"{s} {str(b)[:200]}")
 s, b = call("GET", f"/api/v1/bookings/host/{HOST}", token=host_token)
 check("host dashboard bookings", s == 200, f"{s} {str(b)[:200]}")
 
-# Payment (mock): 2 nights of the guest's 300.00 bid -> 300
-order = {"auctionId": AUCTION, "selectedNights": ["2025-08-15", "2025-08-16"], "amount": 300, "orderInfo": "smoke"}
+# Payment (mock): 2 nights of the guest's 300.00 bid -> 300.
+# The bid starts on the auction's start date (seed dates are shifted to "now" by db/init/98_).
+import datetime as _dt
+s, b = call("GET", "/api/v1/auctions/property/3109")
+items = b if isinstance(b, list) else (b or {}).get("data") or (b or {}).get("auctions") or [] if isinstance(b, dict) else []
+start = next((str(a.get("start_date") or a.get("startDate"))[:10] for a in items if isinstance(a, dict) and str(a.get("id")) == AUCTION), None)
+if not start:  # fallback: same shift rule as 98_shift_dates_to_now.sql
+	start = (_dt.date(2025, 8, 15) + (_dt.date.today() - _dt.date(2025, 8, 12))).isoformat()
+d0 = _dt.date.fromisoformat(start)
+nights = [d0.isoformat(), (d0 + _dt.timedelta(days=1)).isoformat()]
+order = {"auctionId": AUCTION, "selectedNights": nights, "amount": 300, "orderInfo": "smoke"}
 s, b = call("POST", "/api/v1/payment/zalopay/create", order, token=guest_token, headers={"idempotency-key": str(uuid.uuid4())})
 app_trans_id = b.get("appTransId") if s == 200 and isinstance(b, dict) else None
 check("mock payment create", bool(app_trans_id), f"{s} {str(b)[:300]}")

@@ -18,6 +18,7 @@ data directory**, and aborts on the first error.
 | 15_seed_host_dashboard.sql | 5 properties + auctions + 90 bookings for host 2884 | HostDashboard.sql, fixed |
 | 16_seed_property_images.sql | Property images | V.0_0_6 |
 | 17_seed_bids_payments.sql | 3 bids/auction, PAID payments for ended auctions | new |
+| 98_shift_dates_to_now.sql | Shift all seed dates by (today - 2025-08-12): ACTIVE auctions stay open, PENDING upcoming | new |
 | 99_reset_sequences.sql | Move every sequence past max(id) (seeds use explicit ids) | new |
 
 Fixes applied to the originals (kept untouched in `Repository/Migration_scripts/postgres/`):
@@ -29,8 +30,8 @@ Fixes applied to the originals (kept untouched in `Repository/Migration_scripts/
   hosts must exist before properties; images after HostDashboard (it creates properties 1-5).
 - Duplicate `payment_tables*.sql` dropped: the tables are already in 01_schema.
 
-Expected after init: 0 errors; users 26, properties 25, auctions 99, bids 297,
-bid_events 297, bookings 90, payment_sessions 10.
+Expected after init: 0 errors; users 26, properties 25, auctions 99, bids 298,
+bid_events 298, bookings 90, payment_sessions 10. Seed dates are shifted to "now" by 98_ (see below).
 
 Reset (destroys all data):
 ```bash
