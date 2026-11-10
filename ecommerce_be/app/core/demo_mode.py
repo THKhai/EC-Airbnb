@@ -28,6 +28,9 @@ DEMO_TOKEN_TTL_SECONDS = int(os.getenv("DEMO_TOKEN_TTL_SECONDS", str(8 * 3600)))
 # Only these users can be logged into without a password.
 DEMO_USER_IDS = [int(x) for x in os.getenv("DEMO_USER_IDS", "500001,2884").split(",") if x.strip().isdigit()]
 
+# Tolerated clock difference between this server and the token issuer (iat/nbf/exp checks).
+CLOCK_SKEW_LEEWAY_SECONDS = int(os.getenv("JWT_LEEWAY_SECONDS", "60"))
+
 _SECRET = os.getenv("DEMO_JWT_SECRET", "")
 _MIN_SECRET_LEN = 32
 
@@ -78,4 +81,4 @@ def decode_token(token: str) -> dict:
 	"""Raises jwt.ExpiredSignatureError / jwt.InvalidTokenError like the Auth0 path."""
 	if not secret_configured():
 		raise jwt.InvalidTokenError("demo secret not configured")
-	return jwt.decode(token, _SECRET, algorithms=["HS256"], audience=DEMO_AUDIENCE, issuer=DEMO_ISSUER)
+	return jwt.decode(token, _SECRET, algorithms=["HS256"], audience=DEMO_AUDIENCE, issuer=DEMO_ISSUER, leeway=CLOCK_SKEW_LEEWAY_SECONDS)

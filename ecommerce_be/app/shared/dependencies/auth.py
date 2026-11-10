@@ -13,6 +13,9 @@ from .database import get_db_session
 from ...core.config import settings
 from ...core import demo_mode
 
+import logging
+_log = logging.getLogger(__name__)
+
 security = HTTPBearer(auto_error=False)
 
 # JWKS client for Auth0
@@ -39,12 +42,16 @@ def _decode_with_jwks(token: str) -> dict:
 			signing_key,
 			algorithms=["RS256"],
 			audience=settings.auth0.audience,
+			leeway=demo_mode.CLOCK_SKEW_LEEWAY_SECONDS,
 			issuer=f"https://{settings.auth0.domain}/" if settings.auth0.domain else None,
 		)
 		return payload
 	except jwt.ExpiredSignatureError:
 		raise TokenExpiredError()
-	except jwt.InvalidTokenError:
+	except jwt.InvalidTokenError as e:
+		# Log the reason (never the token) so 401s are diagnosable, e.g. ImmatureSignatureError
+		# when the server clock is behind the issuer.
+		_log.warning("Auth0 token rejected: %s: %s", type(e).__name__, e)
 		raise InvalidTokenError()
 	except Exception as e:
 		raise AuthenticationError(f"Authentication failed: {str(e)}")
