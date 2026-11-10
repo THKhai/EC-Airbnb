@@ -62,12 +62,13 @@ def create_app() -> FastAPI:
     )
     
     # Setup middleware
-    setup_cors(app)
     add_error_handlers(app)
-    
+
+    # One CORS policy with explicit origins (ALLOWED_ORIGINS). "*" + credentials is rejected
+    # by browsers for credentialed requests, and two stacked CORS middlewares conflicted.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.app.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
