@@ -19,9 +19,11 @@ import {
     AlertTriangle,
     CheckCircle,
     XCircle,
+    Moon,
+    LogOut,
 } from "lucide-react"
 import {useAuctionCountdown} from "@/hooks/use-countdown";
-import { addMonths, subMonths, format, isSameDay, eachDayOfInterval, startOfMonth, endOfMonth } from "date-fns"
+import { addMonths, subMonths, addDays, subDays, format, isSameDay, eachDayOfInterval, startOfMonth, endOfMonth } from "date-fns"
 import {useCalendarContext} from "@/contexts/calender-context";
 import SimpleCountdown from "@/components/traveller/count-down";
 
@@ -87,16 +89,10 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-    // Helper function to calculate nights properly
-    const calculateNights = (dates: Date[]): number => {
-        //OPTION 1: Each selected date = 1 night (your preferred logic)
-        return dates.length;
+    // Hotel-style nights: selectedDates holds the NIGHTS (check-in .. check-out - 1).
+    // The check-out day is the morning you leave: it is not a night and is not paid for.
+    const calculateNights = (dates: Date[]): number => dates.length
 
-        // OPTION 2: Hotel style (dates.length - 1) - commented out
-        // return Math.max(0, dates.length - 1);
-    }
-
-    // Helper function to get date range display
     const getDateRangeDisplay = (dates: Date[]) => {
         if (dates.length === 0) return { checkIn: null, checkOut: null, nights: 0 };
 
@@ -104,10 +100,16 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
 
         return {
             checkIn: sortedDates[0],
-            checkOut: sortedDates[sortedDates.length - 1],
+            checkOut: addDays(sortedDates[sortedDates.length - 1], 1),
             nights: calculateNights(dates)
         };
     }
+
+    // true after the check-in click, until the check-out day is clicked
+    const [pickingCheckOut, setPickingCheckOut] = useState(false)
+    useEffect(() => {
+        if (selectedDates.length === 0) setPickingCheckOut(false)
+    }, [selectedDates])
 
     // ==================== REST OF THE COMPONENT ====================
 
@@ -393,6 +395,32 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
             return; // Exit early
         }
 
+        // Second click: the check-out day. It is not a night, so it may be outside the window or booked.
+        if (pickingCheckOut && selectedDates.length === 1 && date > selectedDates[0]) {
+            const checkInDate = selectedDates[0]
+            const nights = eachDayOfInterval({ start: checkInDate, end: subDays(date, 1) })
+            const blocked = nights.filter((n) => {
+                const d = calendarData.find((x) => isSameDay(x.date, n))
+                return !isDateInBiddingWindow(n) || !!d?.is_booked
+            })
+            if (blocked.length > 0) {
+                toast({
+                    title: "Range Contains Unavailable Nights",
+                    description: `${blocked.length} night(s) in your range are unavailable. Please select a different range.`,
+                    variant: "destructive",
+                })
+                return
+            }
+            setSelectedDates(nights)
+            setPickingCheckOut(false)
+            toast({
+                title: `${nights.length} night${nights.length > 1 ? "s" : ""} selected 🌙`,
+                description: `Check-in ${format(checkInDate, "MMM d")} · Check-out ${format(date, "MMM d")}`,
+                duration: 4000,
+            })
+            return
+        }
+
         if (dayData.disabled || !dayData.isInBiddingWindow) {
             toast({
                 title: "Date Not Available",
@@ -411,76 +439,20 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
             return;
         }
 
-        // NEW LOGIC: Check-in/Check-out style selection
-        const currentDates = [...selectedDates];
-
-        // Case 1: No dates selected yet OR both check-in and check-out are already selected
-        // -> Start fresh with new check-in date
-        if (currentDates.length === 0 || currentDates.length >= 2) {
-            setSelectedDates([date]);
-            toast({
-                title: "Check-in Date Selected",
-                description: `Check-in: ${format(date, "MMM d, yyyy")}. Now select your check-out date.`,
-                duration: 3000,
-            });
-            return;
+        // Clicking the check-in night again clears the selection
+        if (pickingCheckOut && selectedDates.length === 1 && isSameDay(date, selectedDates[0])) {
+            setSelectedDates([])
+            return
         }
 
-        // Case 2: Only check-in date is selected
-        if (currentDates.length === 1) {
-            const checkInDate = currentDates[0];
-
-            // If clicking the same date, deselect it
-            if (isSameDay(date, checkInDate)) {
-                setSelectedDates([]);
-                toast({
-                    title: "Selection Cleared",
-                    description: "Please select your check-in date again.",
-                });
-                return;
-            }
-
-            // If clicking a date BEFORE check-in, reset with new check-in
-            if (date < checkInDate) {
-                setSelectedDates([date]);
-                toast({
-                    title: "Check-in Date Updated",
-                    description: `New check-in: ${format(date, "MMM d, yyyy")}. Now select your check-out date.`,
-                    duration: 3000,
-                });
-                return;
-            }
-
-            // If clicking a date AFTER check-in, set as check-out
-            // Generate all dates in the range
-            const dateRange = eachDayOfInterval({start: checkInDate, end: date});
-
-            // Check if any dates in range are booked
-            const bookedDatesInRange = dateRange.filter(rangeDate => {
-                const dayInfo = calendarData.find(d => isSameDay(d.date, rangeDate));
-                return dayInfo?.is_booked || (dayInfo && dayInfo.disabled);
-            });
-
-            if (bookedDatesInRange.length > 0) {
-                // Some dates in range are booked - show modal or warning
-                toast({
-                    title: "Range Contains Booked Dates",
-                    description: `${bookedDatesInRange.length} date(s) in your range are unavailable. Please select a different range.`,
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            // All dates in range are available - confirm selection
-            setSelectedDates(dateRange);
-            const nights = calculateNights(dateRange);
-
-            toast({
-                title: "Date Range Selected! 🎯",
-                description: `Check-in: ${format(checkInDate, "MMM d")} | Check-out: ${format(date, "MMM d")} | ${nights} nights`,
-                duration: 4000,
-            });
-        }
+        // First click (or a new selection): check-in, 1 night until a check-out day is picked
+        setSelectedDates([date])
+        setPickingCheckOut(true)
+        toast({
+            title: "Check-in selected",
+            description: `Check-in ${format(date, "MMM d, yyyy")} (1 night). Now click your check-out day.`,
+            duration: 3000,
+        })
     }
 
     const handleTimerRefresh = useCallback(() => {
@@ -494,12 +466,13 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
         // IMPORTANT: Fix trip suggestion logic too
         const range = eachDayOfInterval({ start: suggestion.startDate, end: suggestion.endDate })
         setSelectedDates(range)
+        setPickingCheckOut(false)
         setShowBiddingCalendar(true)
 
         const nightsCount = calculateNights(range);
         toast({
             title: "Trip Selected! 🎯",
-            description: `Selected ${range.length} dates for ${nightsCount} nights`,
+            description: `${nightsCount} nights selected`,
         })
     }
 
@@ -641,13 +614,15 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
                                                         }
 
                                                         const isSelected = selectedDates.some((date) => isSameDay(date, day.date))
-                                                        const isInRange =
-                                                            selectedDates.length > 1 &&
-                                                            day.date >= selectedDates[0] &&
-                                                            day.date <= selectedDates[selectedDates.length - 1]
+                                                        const isCheckIn = selectedDates.length > 0 && isSameDay(day.date, selectedDates[0])
+                                                        const isCheckOut = !!dateRangeInfo.checkOut && isSameDay(day.date, dateRangeInfo.checkOut)
 
                                                         // Different styling for disabled dates
                                                         const getDateStyling = () => {
+                                                            if (isCheckOut) {
+                                                                // check-out morning: not a night, dashed outline
+                                                                return "border-dashed border-purple-300 bg-purple-50/40 cursor-pointer"
+                                                            }
                                                             if (day.disabled || !day.isInBiddingWindow) {
                                                                 return "bg-gray-50 border-gray-200 cursor-not-allowed opacity-50"
                                                             }
@@ -655,10 +630,8 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
                                                                 return "bg-gray-100 border-gray-300 cursor-not-allowed"
                                                             }
                                                             if (isSelected) {
-                                                                return "border-purple-500 ring-2 ring-purple-200 scale-105 " + getDemandBgColor(day.demand_level)
-                                                            }
-                                                            if (isInRange) {
-                                                                return "border-purple-300 bg-purple-50"
+                                                                // a night of the stay: light purple + moon
+                                                                return "border-purple-300 bg-purple-100 cursor-pointer" + (isCheckIn ? " ring-2 ring-purple-200" : "")
                                                             }
                                                             return getDemandBgColor(day.demand_level) + " hover:scale-105 cursor-pointer"
                                                         }
@@ -675,7 +648,12 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
                                                                     >
                                                                         <div className="text-center">
                                                                             <div className="text-sm font-medium">{format(day.date, "d")}</div>
-                                                                            {day.disabled || !day.isInBiddingWindow ? (
+                                                                            {isCheckOut ? (
+                                                                                <div className="flex items-center justify-center gap-0.5 text-[10px] font-medium text-purple-500">
+                                                                                    <LogOut className="h-3 w-3" aria-hidden />
+                                                                                    Check-out
+                                                                                </div>
+                                                                            ) : day.disabled || !day.isInBiddingWindow ? (
                                                                                 <div className="text-xs text-gray-400">Not available</div>
                                                                             ) : day.is_booked ? (
                                                                                 <div className="text-xs text-gray-500">Booked</div>
@@ -688,7 +666,13 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
                                                                                 </>
                                                                             )}
                                                                         </div>
-                                                                        {!day.disabled && !day.is_booked && day.isInBiddingWindow && (
+                                                                        {isSelected && (
+                                                                            <Moon
+                                                                                className="absolute top-1 left-1 h-3 w-3 fill-purple-300 text-purple-500"
+                                                                                aria-label="Night of your stay"
+                                                                            />
+                                                                        )}
+                                                                        {!isCheckOut && !day.disabled && !day.is_booked && day.isInBiddingWindow && (
                                                                             <div
                                                                                 className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
                                                                                     day.demand_level === "low"
@@ -704,6 +688,8 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
                                                                 <TooltipContent>
                                                                     <div className="text-sm space-y-1">
                                                                         <div className="font-medium">{format(day.date, "MMM d, yyyy")}</div>
+                                                                        {isSelected && <div className="text-purple-600">🌙 Night of your stay</div>}
+                                                                        {isCheckOut && <div className="text-purple-600">Check-out day (not a night, not charged)</div>}
                                                                         {day.disabled || !day.isInBiddingWindow ? (
                                                                             <div className="text-red-600">Outside bidding window</div>
                                                                         ) : day.is_booked ? (
@@ -744,6 +730,10 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
                                                     <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
                                                     <span className="text-sm">Booked/Unavailable</span>
                                                 </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <Moon className="h-3 w-3 fill-purple-300 text-purple-500" aria-hidden />
+                                                    <span className="text-sm">Your nights</span>
+                                                </div>
                                             </div>
 
                                             {/* FIXED: Selected Dates Summary */}
@@ -754,18 +744,20 @@ export function CalenderBidingFeature({ property_id }: CalendarBidingProps) {
                                                         <span className="font-medium">Selected Dates</span>
                                                     </div>
                                                     <div className="text-green-600 text-sm space-y-1">
-                                                        {dateRangeInfo.checkIn && (
-                                                            <div><strong>Start date:</strong> {format(dateRangeInfo.checkIn, "MMM d, yyyy")}</div>
+                                                        {dateRangeInfo.checkIn && dateRangeInfo.checkOut && (
+                                                            <>
+                                                                <div><strong>Check-in:</strong> {format(dateRangeInfo.checkIn, "EEE, MMM d, yyyy")} (from 14:00)</div>
+                                                                <div><strong>Check-out:</strong> {format(dateRangeInfo.checkOut, "EEE, MMM d, yyyy")} (by 12:00)</div>
+                                                            </>
                                                         )}
-                                                        {dateRangeInfo.checkOut && selectedDates.length > 1 && (
-                                                            <div><strong>End date:</strong> {format(dateRangeInfo.checkOut, "MMM d, yyyy")}</div>
-                                                        )}
-                                                        <div><strong>Selected dates:</strong> {selectedDates.length}</div>
-                                                        <div><strong>Total nights:</strong> {dateRangeInfo.nights}</div>
-
-                                                        {/* Show calculation explanation */}
+                                                        <div className="flex items-center gap-1">
+                                                            <Moon className="h-3.5 w-3.5 fill-purple-300 text-purple-500" aria-hidden />
+                                                            <strong>{dateRangeInfo.nights} night{dateRangeInfo.nights === 1 ? "" : "s"}</strong>
+                                                        </div>
                                                         <div className="text-xs text-green-500 mt-2 italic">
-                                                            Note: Each selected date = 1 night of stay
+                                                            {pickingCheckOut
+                                                                ? "Click your check-out day to stay more than 1 night."
+                                                                : "You pay per night; the check-out day is not charged."}
                                                         </div>
                                                     </div>
                                                 </div>

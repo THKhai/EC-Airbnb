@@ -63,7 +63,8 @@ export function BookingPanel({
         bid_amount: totalBid,
         bid_time: new Date().toISOString(),
         check_in: selectedDates.length > 0 ? format(selectedDates[0], "yyyy-MM-dd") : "",
-        check_out: selectedDates.length > 0 ? format(selectedDates[selectedDates.length - 1], "yyyy-MM-dd") : "",
+        // selectedDates are the nights; check-out is the morning after the last night
+        check_out: selectedDates.length > 0 ? format(addDays(selectedDates[selectedDates.length - 1], 1), "yyyy-MM-dd") : "",
         allow_partial: allowPartial,
         partial_awarded:!allowPartial, // set to false if allow_partial is false
         created_at: new Date().toISOString()
@@ -145,7 +146,7 @@ export function BookingPanel({
                                 <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="font-semibold text-blue-900">
-                                            {selectedNights} days selected
+                                            🌙 {selectedNights} night{selectedNights === 1 ? "" : "s"}
                                         </span>
                                         <Button
                                             variant="ghost"
@@ -157,8 +158,8 @@ export function BookingPanel({
                                         </Button>
                                     </div>
                                     <div className="text-sm text-blue-700 mb-3">
-                                        {format(selectedDates[0], "MMM d")} -{" "}
-                                        {format(selectedDates[selectedDates.length - 1], "MMM d")}
+                                        Check-in {format(selectedDates[0], "MMM d")} → Check-out{" "}
+                                        {format(addDays(selectedDates[selectedDates.length - 1], 1), "MMM d")}
                                     </div>
                                 </div>
 
