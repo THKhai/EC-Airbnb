@@ -1,7 +1,7 @@
 from app.db.models.Bid import Bids
 from app.schemas.BidDTO import BidsDTO
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, text
 from datetime import datetime
 from typing import Optional, Tuple, Any
 
@@ -69,6 +69,19 @@ class BidRepository:
         else:
             new_bid = self.create_new_bid(bids_dto)
             return new_bid, True
+
+    def refresh_auction_stats(self, auction_id: str) -> None:
+        """Recompute auctions.total_bids and current_highest_bid (per night) from the ACTIVE bids."""
+        self.db.execute(
+            text(
+                "UPDATE auctions a SET total_bids = s.n, current_highest_bid = s.top "
+                "FROM (SELECT count(*) AS n, max(price_per_night) AS top FROM bids "
+                "      WHERE auction_id = CAST(:aid AS uuid) AND status = 'ACTIVE') s "
+                "WHERE a.id = CAST(:aid AS uuid)"
+            ),
+            {"aid": str(auction_id)},
+        )
+        self.db.commit()
 
     def rollback(self):
         """Rollback the current transaction."""

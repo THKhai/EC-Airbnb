@@ -19,6 +19,11 @@ class BidService:
 
             if bid_record:
                 action = "created" if was_created else "updated"
+                try:
+                    self.bid_repository.refresh_auction_stats(bid_record.auction_id)
+                except Exception as e:  # the bid itself is saved; stats are derived data
+                    self.bid_repository.rollback()
+                    print(f"Could not refresh auction stats: {e}")
                 return {
                     "success": True,
                     "bid_id": str(bid_record.id),

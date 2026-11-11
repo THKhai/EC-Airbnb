@@ -4,10 +4,14 @@ const API_URL = `${API_ORIGIN}/api`;
 export const biddingAPI = {
     async fetch_sending_bid(bidData: BidData) {
         try {
+            const getToken = typeof window !== 'undefined' ? (window as any).__getAccessTokenSilently : null
+            const token: string | null = getToken ? await getToken() : null
+            if (!token) throw new Error('Please sign in to place a bid')
             const response = await fetch(`${API_URL}/sending_bid`, {
                 method: "POST",
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify(bidData)
             })

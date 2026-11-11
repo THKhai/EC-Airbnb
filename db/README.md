@@ -17,7 +17,7 @@ data directory**, and aborts on the first error.
 | 14_property_types_notification.sql | property_types/categories, notification/subscription changes | V.0_0_4, fixed |
 | 15_seed_host_dashboard.sql | 5 properties + auctions + 90 bookings for host 2884 | HostDashboard.sql, fixed |
 | 16_seed_property_images.sql | Property images | V.0_0_6 |
-| 17_seed_bids_payments.sql | 3 bids/auction, PAID payments for ended auctions | new |
+| 17_seed_bids_payments.sql | 3 bids/auction, calendar prices from those bids, PAID payments for ended auctions | new |
 | 98_shift_dates_to_now.sql | Shift all seed dates by (today - 2025-08-12): ACTIVE auctions stay open, PENDING upcoming | new |
 | 99_reset_sequences.sql | Move every sequence past max(id) (seeds use explicit ids) | new |
 

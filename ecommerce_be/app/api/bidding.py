@@ -10,6 +10,8 @@ from rstream import (
 )
 import json
 from app.services.rabbitMQ_service import RabbitMQService
+from app.shared.dependencies.auth import get_current_user
+from app.shared.models import User
 from datetime import datetime as dt
 # Use APIRouter instead of FastAPI app
 bidding = APIRouter(
@@ -125,8 +127,11 @@ async def call_back(msg: AMQPMessage,
 @inject
 async def sending_bid(
         bid: BidsDTO,
+        current_user: User = Depends(get_current_user),
         rabbitMQ_service:RabbitMQService = Depends(Provide[Container.rabbitMQStream_service]) ,
     ):
+     # The bidder is whoever the token belongs to; a user_id in the body is ignored.
+     bid = bid.model_copy(update={"user_id": current_user.id})
      return await rabbitMQ_service.use_producer(bid)
 
 # API travel the message from the stream 

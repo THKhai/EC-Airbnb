@@ -96,21 +96,18 @@ class CalendarService:
                                      price_per_night) -> MessageResponseDTO:
         """Update availability of a calendar day"""
 
-        # tính giá phòng trên ngày
-        nights = (check_out - check_in).days
-        if nights:
-            total_price = price_per_night * nights
-        else:
-            total_price = price_per_night * (nights + 1)
-        total_day = (check_out - check_in).days + 1
-        bid_amount = total_price / total_day
+        # Giá mỗi đêm = price_per_night của bid (DB đã tính total / nights).
+        # Các đêm là check_in .. check_out - 1: ngày check-out không phải một đêm.
+        nights = max(1, (check_out - check_in).days)
+        bid_amount = float(price_per_night)
+        last_night = check_in + timedelta(days=nights - 1)
         # 1. Lấy chuỗi ngày mà user đó bid
             #1.1 có thể có ngày,có thể chưa có ngày đó - hoặc nên tạo ngày khi có auction -> trigger
             #=> luôn có ngày để check
         try:
             calendar_entries = self.calendar_repository.get_calendar_data_range(
                 check_in,
-                check_out,
+                last_night,
                 property_id,
                 auction_id
             )
